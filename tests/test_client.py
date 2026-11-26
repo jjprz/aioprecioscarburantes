@@ -243,3 +243,9 @@ async def test_no_retry_on_client_error(aiohttp_server: ServerFactory) -> None:
         with pytest.raises(PreciosCarburantesConnectionError):
             await client.get_provinces()
     assert calls == 1
+
+
+def test_connection_error_without_arguments() -> None:
+    """The connection error can be raised without a message, like any exception."""
+    err = PreciosCarburantesConnectionError()
+    assert err.status is None
