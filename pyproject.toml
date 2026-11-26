@@ -25,6 +25,7 @@ test = ["pytest-aiohttp", "pytest", "pytest-asyncio", "mypy", "ruff"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.mypy]
