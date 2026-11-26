@@ -174,3 +174,27 @@ async def test_station_by_id(aiohttp_server: ServerFactory) -> None:
         }
         with pytest.raises(PreciosCarburantesNotFoundError):
             await client.get_station_by_id("1")
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "call"),
+    [
+        ("Listados/Provincias/", [{"Provincia": "X"}], "get_provinces"),
+        (
+            "EstacionesTerrestres/FiltroMunicipio/1",
+            {"Fecha": "mal", "ListaEESSPrecio": []},
+            "get_stations_by_municipality",
+        ),
+    ],
+)
+async def test_unexpected_format(
+    aiohttp_server: ServerFactory, path: str, payload: Any, call: str
+) -> None:
+    """A changed response format is an API error, not a crash."""
+    client = await make_client(
+        aiohttp_server, {path: lambda: web.json_response(payload)}
+    )
+    async with client:
+        method = getattr(client, call)
+        with pytest.raises(PreciosCarburantesError):
+            await (method() if call == "get_provinces" else method("1"))

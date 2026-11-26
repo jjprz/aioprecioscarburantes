@@ -15,6 +15,7 @@ from .exceptions import (
 from .models import Municipality, Province, Station, StationList
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
 BASE_URL = (
@@ -24,6 +25,16 @@ BASE_URL = (
 # Undocumented API used by the geoportalgasolineras.es website. It also lists
 # stations with restricted sales, which the official service leaves out.
 GEOPORTAL_URL = "https://geoportalgasolineras.es/rest"
+
+
+def _parse[T](build: Callable[[], T]) -> T:
+    """Build models, turning an unexpected response format into an API error."""
+    try:
+        return build()
+    except (KeyError, TypeError, ValueError, AttributeError) as err:
+        raise PreciosCarburantesError(
+            f"Unexpected response from the fuel prices API: {err!r}"
+        ) from err
 
 
 class PreciosCarburantes:
@@ -78,26 +89,26 @@ class PreciosCarburantes:
     async def get_provinces(self) -> list[Province]:
         """Return all provinces."""
         data = await self._request("Listados/Provincias/")
-        return [Province.from_api(item) for item in data]
+        return _parse(lambda: [Province.from_api(item) for item in data])
 
     async def get_municipalities(self, province_id: str) -> list[Municipality]:
         """Return the municipalities of a province."""
         data = await self._request(f"Listados/MunicipiosPorProvincia/{province_id}")
-        return [Municipality.from_api(item) for item in data]
+        return _parse(lambda: [Municipality.from_api(item) for item in data])
 
     async def get_stations_by_municipality(self, municipality_id: str) -> StationList:
         """Return the stations and prices of a municipality."""
         data = await self._request(
             f"EstacionesTerrestres/FiltroMunicipio/{municipality_id}"
         )
-        return StationList.from_api(data)
+        return _parse(lambda: StationList.from_api(data))
 
     async def get_stations_by_province(self, province_id: str) -> StationList:
         """Return the stations and prices of a province."""
         data = await self._request(
             f"EstacionesTerrestres/FiltroProvincia/{province_id}"
         )
-        return StationList.from_api(data)
+        return _parse(lambda: StationList.from_api(data))
 
     async def get_station(self, municipality_id: str, station_id: str) -> Station:
         """Return one station (the API has no per-station query)."""
@@ -120,7 +131,7 @@ class PreciosCarburantes:
         )
         if not data or str(data.get("eessId")) != str(station_id):
             raise PreciosCarburantesNotFoundError(f"Station {station_id} not found")
-        return Station.from_geoportal(data)
+        return _parse(lambda: Station.from_geoportal(data))
 
     async def close(self) -> None:
         """Close the session if it was created here."""
