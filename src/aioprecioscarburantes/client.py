@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import ssl
 from typing import TYPE_CHECKING, Any, Self
 
 from aiohttp import ClientError, ClientResponseError, ClientSession, ClientTimeout
@@ -22,6 +23,13 @@ BASE_URL = (
     "https://sedeaplicaciones.minetur.gob.es"
     "/ServiciosRESTCarburantes/PreciosCarburantes"
 )
+# Since November 2026 the Ministry's server only accepts the AES256-GCM-SHA384
+# cipher, without forward secrecy, which Python's default context leaves out.
+# Allow it, on top of the defaults, for this server only. Built at import time,
+# because loading the certificates blocks.
+MINISTRY_SSL_CONTEXT = ssl.create_default_context()
+MINISTRY_SSL_CONTEXT.set_ciphers("DEFAULT:AES256-GCM-SHA384")
+
 # Undocumented API used by the geoportalgasolineras.es website. It also lists
 # stations with restricted sales, which the official service leaves out.
 GEOPORTAL_URL = "https://geoportalgasolineras.es/rest"
@@ -64,6 +72,7 @@ class PreciosCarburantes:
                 f"{base_url or self._base_url}/{path}",
                 timeout=self._timeout,
                 headers={"Accept": "application/json"},
+                ssl=MINISTRY_SSL_CONTEXT if base_url is None else True,
             ) as response:
                 response.raise_for_status()
                 text = await response.text()

@@ -39,3 +39,9 @@ municipality or province ids.
 ("L-D: 24H", "L-S: 07:00-22:00; D: 08:00-14:00", "L-V: 07:00-14:00 y 16:00-21:00"…)
 and returns a `Schedule` with `is_open(datetime)`; `next_change(schedule, datetime)`
 gives the next opening or closing. Unknown or ambiguous formats return `None`.
+
+### TLS note
+
+Since November 2026 the Ministry's server only accepts the `AES256-GCM-SHA384`
+cipher, which Python's default SSL context does not offer. The client allows it,
+on top of the defaults, for requests to that server only.
