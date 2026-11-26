@@ -46,6 +46,37 @@ class SaleType(StrEnum):
     RESTRICTED = "R"
 
 
+# Geoportal web codes for the sale type
+GEOPORTAL_SALE_TYPES = {"C": SaleType.PUBLIC, "T": SaleType.RESTRICTED}
+
+# Geoportal web price fields
+GEOPORTAL_PRICE_FIELDS = {
+    FuelType.ADBLUE: "precioAdb",
+    FuelType.AMMONIA: "precioAmo",
+    FuelType.BIODIESEL: "precioBiodiesel",
+    FuelType.BIOETHANOL: "precioBioetanol",
+    FuelType.COMPRESSED_BIOGAS: "precioBgnc",
+    FuelType.LIQUEFIED_BIOGAS: "precioBgnl",
+    FuelType.RENEWABLE_DIESEL: "precioDren",
+    FuelType.COMPRESSED_NATURAL_GAS: "precioGasNatComp",
+    FuelType.LIQUEFIED_NATURAL_GAS: "precioGasNatLicuado",
+    FuelType.LPG: "precioGasesLicuados",
+    FuelType.DIESEL_A: "precioGasoleoA",
+    FuelType.DIESEL_B: "precioGasoleoB",
+    FuelType.DIESEL_PREMIUM: "precioGasoleoPremium",
+    FuelType.GASOLINE_95_E10: "precioGasolina95E10",
+    FuelType.GASOLINE_95_E25: "precioGasolina95E25",
+    FuelType.GASOLINE_95_E5: "precioGasolina95E5",
+    FuelType.GASOLINE_95_E5_PREMIUM: "precioGasolina95E5Premium",
+    FuelType.GASOLINE_95_E85: "precioGasolina95E85",
+    FuelType.GASOLINE_98_E10: "precioGasolina98E10",
+    FuelType.GASOLINE_98_E5: "precioGasolina98E5",
+    FuelType.RENEWABLE_GASOLINE: "precioGren",
+    FuelType.HYDROGEN: "precioHidrogeno",
+    FuelType.METHANOL: "precioMet",
+}
+
+
 def parse_float(value: str | None) -> float | None:
     """Parse a number with a decimal comma; empty means no value."""
     if value is None or not value.strip():
@@ -105,9 +136,9 @@ class Station:
     address: str
     locality: str
     municipality: str
-    municipality_id: str
+    municipality_id: str | None
     province: str
-    province_id: str
+    province_id: str | None
     postal_code: str
     schedule: str
     latitude: float | None
@@ -137,6 +168,35 @@ class Station:
             latitude=parse_float(data.get("Latitud")),
             longitude=parse_float(data.get("Longitud (WGS84)")),
             sale_type=SaleType(data["Tipo Venta"]),
+            prices=prices,
+        )
+
+    @classmethod
+    def from_geoportal(cls, data: dict[str, Any]) -> Station:
+        """Create from the Geoportal web, which has no municipality/province ids."""
+        prices = {
+            fuel: float(data[key])
+            for fuel, key in GEOPORTAL_PRICE_FIELDS.items()
+            if data.get(key) is not None
+        }
+        latitude = data.get("coordenadaY")
+        longitude = data.get("coordenadaX")
+        return cls(
+            id=str(data["eessId"]),
+            brand=data.get("rotulo") or "",
+            address=data.get("direccion") or "",
+            locality=data.get("localidad") or "",
+            municipality=data.get("municipio") or "",
+            municipality_id=None,
+            province=data.get("provincia") or "",
+            province_id=None,
+            postal_code=data.get("codPostal") or "",
+            schedule=data.get("horario") or "",
+            latitude=None if latitude is None else float(latitude),
+            longitude=None if longitude is None else float(longitude),
+            sale_type=GEOPORTAL_SALE_TYPES.get(
+                data.get("tipoVenta") or "", SaleType.RESTRICTED
+            ),
             prices=prices,
         )
 

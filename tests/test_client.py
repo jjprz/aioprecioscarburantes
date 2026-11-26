@@ -150,3 +150,27 @@ async def test_api_error(aiohttp_server: ServerFactory) -> None:
     async with client:
         with pytest.raises(PreciosCarburantesError):
             await client.get_stations_by_municipality("1")
+
+
+async def test_station_by_id(aiohttp_server: ServerFactory) -> None:
+    """A restricted station is read from the Geoportal web."""
+    client = await make_client(
+        aiohttp_server,
+        {
+            "9683/busquedaEstacionPrecio": json_reply("geoportal_estacion.json"),
+            "1/busquedaEstacionPrecio": lambda: web.Response(text=""),
+        },
+    )
+    client._geoportal_url = client._base_url  # noqa: SLF001
+    async with client:
+        station = await client.get_station_by_id("9683")
+        assert station.brand == "COOPERATIVA"
+        assert station.sale_type is SaleType.RESTRICTED
+        assert station.municipality_id is None
+        assert station.latitude == pytest.approx(37.195583)
+        assert station.prices == {
+            FuelType.DIESEL_A: pytest.approx(1.802),
+            FuelType.DIESEL_B: pytest.approx(1.477),
+        }
+        with pytest.raises(PreciosCarburantesNotFoundError):
+            await client.get_station_by_id("1")

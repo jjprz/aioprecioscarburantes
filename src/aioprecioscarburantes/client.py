@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Self
 
 from aiohttp import ClientError, ClientResponseError, ClientSession, ClientTimeout
@@ -20,6 +21,9 @@ BASE_URL = (
     "https://sedeaplicaciones.minetur.gob.es"
     "/ServiciosRESTCarburantes/PreciosCarburantes"
 )
+# Undocumented API used by the geoportalgasolineras.es website. It also lists
+# stations with restricted sales, which the official service leaves out.
+GEOPORTAL_URL = "https://geoportalgasolineras.es/rest"
 
 
 class PreciosCarburantes:
@@ -30,26 +34,29 @@ class PreciosCarburantes:
         session: ClientSession | None = None,
         request_timeout: float = 30,
         base_url: str = BASE_URL,
+        geoportal_url: str = GEOPORTAL_URL,
     ) -> None:
         """Initialize; pass a session to share it (as Home Assistant does)."""
         self._session = session
         self._base_url = base_url.rstrip("/")
+        self._geoportal_url = geoportal_url.rstrip("/")
         self._close_session = False
         self._timeout = ClientTimeout(total=request_timeout)
 
-    async def _request(self, path: str) -> Any:
-        """Request a path and return the decoded JSON."""
+    async def _request(self, path: str, *, base_url: str | None = None) -> Any:
+        """Request a path and return the decoded JSON (None if empty)."""
         if self._session is None:
             self._session = ClientSession()
             self._close_session = True
         try:
             async with self._session.get(
-                f"{self._base_url}/{path}",
+                f"{base_url or self._base_url}/{path}",
                 timeout=self._timeout,
                 headers={"Accept": "application/json"},
             ) as response:
                 response.raise_for_status()
-                data = await response.json(content_type=None)
+                text = await response.text()
+                data = json.loads(text) if text.strip() else None
         except TimeoutError as err:
             raise PreciosCarburantesConnectionError(
                 "Timeout while connecting to the fuel prices API"
@@ -101,6 +108,19 @@ class PreciosCarburantes:
         raise PreciosCarburantesNotFoundError(
             f"Station {station_id} not found in municipality {municipality_id}"
         )
+
+    async def get_station_by_id(self, station_id: str) -> Station:
+        """Return any station by its id, also those with restricted sales.
+
+        Uses the undocumented Geoportal web API, which may change without notice.
+        The returned station has no municipality or province ids.
+        """
+        data = await self._request(
+            f"{station_id}/busquedaEstacionPrecio", base_url=self._geoportal_url
+        )
+        if not data or str(data.get("eessId")) != str(station_id):
+            raise PreciosCarburantesNotFoundError(f"Station {station_id} not found")
+        return Station.from_geoportal(data)
 
     async def close(self) -> None:
         """Close the session if it was created here."""
