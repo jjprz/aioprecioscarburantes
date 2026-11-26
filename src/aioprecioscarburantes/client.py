@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import ssl
 from typing import TYPE_CHECKING, Any, Self
 
 from aiohttp import ClientError, ClientResponseError, ClientSession, ClientTimeout
@@ -23,6 +24,15 @@ BASE_URL = (
     "https://sedeaplicaciones.minetur.gob.es"
     "/ServiciosRESTCarburantes/PreciosCarburantes"
 )
+# The Ministry's server sometimes only accepts AES256-GCM-SHA384 (RSA key
+# exchange), which Python's default context leaves out. It was seen on
+# 26 November 2026, for a few hours at a time. When a request to that server
+# fails to connect, it is retried with this context, which also allows that
+# cipher; the server still picks a modern one when it offers it. Built at import
+# time, because loading the certificates blocks.
+LEGACY_SSL_CONTEXT = ssl.create_default_context()
+LEGACY_SSL_CONTEXT.set_ciphers("DEFAULT:AES256-GCM-SHA384")
+
 # Undocumented API used by the geoportalgasolineras.es website. It also lists
 # stations with restricted sales, which the official service leaves out.
 GEOPORTAL_URL = "https://geoportalgasolineras.es/rest"
@@ -57,6 +67,8 @@ class PreciosCarburantes:
         self._geoportal_url = geoportal_url.rstrip("/")
         self._retries = retries
         self._retry_delay = retry_delay
+        # Set once the legacy context was needed, to use it first from then on
+        self._prefer_legacy = False
         self._close_session = False
         self._timeout = ClientTimeout(total=request_timeout)
 
@@ -67,17 +79,25 @@ class PreciosCarburantes:
         avoids leaving stations without prices until the next update.
         """
         for attempt in range(self._retries + 1):
+            # Retries to the Ministry's server also allow its legacy cipher
+            legacy = base_url is None and (attempt > 0 or self._prefer_legacy)
             try:
-                return await self._request_once(path, base_url=base_url)
+                data = await self._request_once(path, base_url=base_url, legacy=legacy)
             except PreciosCarburantesConnectionError as err:
                 if attempt == self._retries or (
                     err.status is not None and err.status < 500
                 ):
                     raise
                 await asyncio.sleep(self._retry_delay)
+            else:
+                if legacy:
+                    self._prefer_legacy = True
+                return data
         raise AssertionError  # pragma: no cover
 
-    async def _request_once(self, path: str, *, base_url: str | None) -> Any:
+    async def _request_once(
+        self, path: str, *, base_url: str | None, legacy: bool = False
+    ) -> Any:
         """Request a path and return the decoded JSON (None if empty)."""
         if self._session is None:
             self._session = ClientSession()
@@ -87,6 +107,7 @@ class PreciosCarburantes:
                 f"{base_url or self._base_url}/{path}",
                 timeout=self._timeout,
                 headers={"Accept": "application/json"},
+                ssl=LEGACY_SSL_CONTEXT if legacy else True,
             ) as response:
                 response.raise_for_status()
                 text = await response.text()

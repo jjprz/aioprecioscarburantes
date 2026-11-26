@@ -4,6 +4,7 @@ import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from aiohttp import web
@@ -249,3 +250,25 @@ def test_connection_error_without_arguments() -> None:
     """The connection error can be raised without a message, like any exception."""
     err = PreciosCarburantesConnectionError()
     assert err.status is None
+
+
+async def test_retry_uses_legacy_context(aiohttp_server: ServerFactory) -> None:
+    """Only the retry to the Ministry's server allows the legacy cipher."""
+    calls = 0
+
+    def flaky() -> web.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return web.Response(status=503)
+        return web.json_response(load("provincias.json"))
+
+    client = await make_client(aiohttp_server, {"Listados/Provincias/": flaky})
+    with patch.object(
+        client,
+        "_request_once",
+        wraps=client._request_once,  # noqa: SLF001
+    ) as request_once:
+        async with client:
+            await client.get_provinces()
+    assert [c.kwargs["legacy"] for c in request_once.call_args_list] == [False, True]

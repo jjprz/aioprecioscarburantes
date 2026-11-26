@@ -40,3 +40,10 @@ municipality or province ids.
 and returns a `Schedule` with `is_open(datetime)`; `next_change(schedule, datetime)`
 gives the next opening or closing. Unknown or ambiguous formats return `None`.
 
+### Legacy cipher fallback
+
+At times the Ministry's server only accepts the `AES256-GCM-SHA384` cipher,
+which Python's default SSL context does not offer. Requests are made with the
+default context first; only when one fails to connect is it retried with a
+context that also allows that cipher (the server still chooses a modern cipher
+when it offers one). Requests to other servers are never affected.
