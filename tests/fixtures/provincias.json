@@ -1,0 +1,20 @@
+[
+ {
+  "IDPovincia": "02",
+  "IDCCAA": "07",
+  "Provincia": "ALBACETE",
+  "CCAA": "Castilla la Mancha"
+ },
+ {
+  "IDPovincia": "03",
+  "IDCCAA": "10",
+  "Provincia": "ALICANTE",
+  "CCAA": "Comunidad Valenciana"
+ },
+ {
+  "IDPovincia": "04",
+  "IDCCAA": "01",
+  "Provincia": "ALMERÍA",
+  "CCAA": "Andalucia"
+ }
+]

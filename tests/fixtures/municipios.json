@@ -1,0 +1,26 @@
+[
+ {
+  "IDMunicipio": "6055",
+  "IDProvincia": "41",
+  "IDCCAA": "01",
+  "Municipio": "Aguadulce",
+  "Provincia": "SEVILLA",
+  "CCAA": "Andalucia"
+ },
+ {
+  "IDMunicipio": "6056",
+  "IDProvincia": "41",
+  "IDCCAA": "01",
+  "Municipio": "Alanís",
+  "Provincia": "SEVILLA",
+  "CCAA": "Andalucia"
+ },
+ {
+  "IDMunicipio": "6057",
+  "IDProvincia": "41",
+  "IDCCAA": "01",
+  "Municipio": "Albaida del Aljarafe",
+  "Provincia": "SEVILLA",
+  "CCAA": "Andalucia"
+ }
+]
