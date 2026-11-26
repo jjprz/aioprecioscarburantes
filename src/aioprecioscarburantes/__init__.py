@@ -7,6 +7,7 @@ from .exceptions import (
     PreciosCarburantesNotFoundError,
 )
 from .models import FuelType, Municipality, Province, SaleType, Station, StationList
+from .schedule import Schedule, next_change, parse_schedule
 
 __all__ = [
     "FuelType",
@@ -17,6 +18,9 @@ __all__ = [
     "PreciosCarburantesNotFoundError",
     "Province",
     "SaleType",
+    "Schedule",
     "Station",
     "StationList",
+    "next_change",
+    "parse_schedule",
 ]

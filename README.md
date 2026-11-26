@@ -32,3 +32,10 @@ station, restricted ones included, from the API behind the
 [Geoportal Gasolineras](https://geoportalgasolineras.es) website. That API is
 undocumented and may change without notice; the station it returns has no
 municipality or province ids.
+
+### Opening hours
+
+`parse_schedule(station.schedule)` understands the Ministry's opening hours
+("L-D: 24H", "L-S: 07:00-22:00; D: 08:00-14:00", "L-V: 07:00-14:00 y 16:00-21:00"…)
+and returns a `Schedule` with `is_open(datetime)`; `next_change(schedule, datetime)`
+gives the next opening or closing. Unknown or ambiguous formats return `None`.
