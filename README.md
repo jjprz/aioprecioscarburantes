@@ -40,8 +40,3 @@ municipality or province ids.
 and returns a `Schedule` with `is_open(datetime)`; `next_change(schedule, datetime)`
 gives the next opening or closing. Unknown or ambiguous formats return `None`.
 
-### TLS note
-
-Since November 2026 the Ministry's server only accepts the `AES256-GCM-SHA384`
-cipher, which Python's default SSL context does not offer. The client allows it,
-on top of the defaults, for requests to that server only.
