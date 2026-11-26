@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import TYPE_CHECKING, Any, Self
 
@@ -43,18 +44,40 @@ class PreciosCarburantes:
     def __init__(
         self,
         session: ClientSession | None = None,
+        *,
         request_timeout: float = 30,
         base_url: str = BASE_URL,
         geoportal_url: str = GEOPORTAL_URL,
+        retries: int = 1,
+        retry_delay: float = 2,
     ) -> None:
         """Initialize; pass a session to share it (as Home Assistant does)."""
         self._session = session
         self._base_url = base_url.rstrip("/")
         self._geoportal_url = geoportal_url.rstrip("/")
+        self._retries = retries
+        self._retry_delay = retry_delay
         self._close_session = False
         self._timeout = ClientTimeout(total=request_timeout)
 
     async def _request(self, path: str, *, base_url: str | None = None) -> Any:
+        """Request a path, retrying once after a connection error.
+
+        The Ministry's server sometimes drops a single request; a short retry
+        avoids leaving stations without prices until the next update.
+        """
+        for attempt in range(self._retries + 1):
+            try:
+                return await self._request_once(path, base_url=base_url)
+            except PreciosCarburantesConnectionError as err:
+                if attempt == self._retries or (
+                    err.status is not None and err.status < 500
+                ):
+                    raise
+                await asyncio.sleep(self._retry_delay)
+        raise AssertionError  # pragma: no cover
+
+    async def _request_once(self, path: str, *, base_url: str | None) -> Any:
         """Request a path and return the decoded JSON (None if empty)."""
         if self._session is None:
             self._session = ClientSession()
@@ -74,7 +97,7 @@ class PreciosCarburantes:
             ) from err
         except ClientResponseError as err:
             raise PreciosCarburantesConnectionError(
-                f"Fuel prices API returned HTTP {err.status}"
+                f"Fuel prices API returned HTTP {err.status}", status=err.status
             ) from err
         except (ClientError, ValueError) as err:
             raise PreciosCarburantesConnectionError(

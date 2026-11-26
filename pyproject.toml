@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aioprecioscarburantes"
-version = "0.5.0"
+version = "0.6.0"
 description = "Async client for Spanish fuel prices from the Ministry's PreciosCarburantes service"
 readme = "README.md"
 license = "MIT"
@@ -32,4 +32,4 @@ strict = true
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["CPY001", "TRY003", "EM101", "EM102", "D203", "D213", "COM812", "S101", "PLR2004", "ANN401"]
+ignore = ["PLR0913", "CPY001", "TRY003", "EM101", "EM102", "D203", "D213", "COM812", "S101", "PLR2004", "ANN401"]

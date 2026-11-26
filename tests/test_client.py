@@ -42,7 +42,9 @@ async def make_client(
 
         app.router.add_get(f"/{path}", handler)
     server = await aiohttp_server(app)
-    return PreciosCarburantes(base_url=str(server.make_url("")), request_timeout=1)
+    return PreciosCarburantes(
+        base_url=str(server.make_url("")), request_timeout=1, retry_delay=0
+    )
 
 
 def json_reply(name: str) -> Callable[[], web.Response]:
@@ -132,7 +134,9 @@ async def test_connection_errors(
 
 async def test_unreachable() -> None:
     """An unreachable host is a connection error."""
-    async with PreciosCarburantes(base_url="http://127.0.0.1:9") as client:
+    async with PreciosCarburantes(
+        base_url="http://127.0.0.1:9", retry_delay=0
+    ) as client:
         with pytest.raises(PreciosCarburantesConnectionError):
             await client.get_provinces()
 
@@ -198,3 +202,44 @@ async def test_unexpected_format(
         method = getattr(client, call)
         with pytest.raises(PreciosCarburantesError):
             await (method() if call == "get_provinces" else method("1"))
+
+
+async def test_retry_once(aiohttp_server: ServerFactory) -> None:
+    """A single dropped request is retried; a second failure is raised."""
+    calls = 0
+
+    def flaky() -> web.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return web.Response(status=503)
+        return web.json_response(load("provincias.json"))
+
+    client = await make_client(aiohttp_server, {"Listados/Provincias/": flaky})
+    async with client:
+        assert len(await client.get_provinces()) == 3
+        assert calls == 2
+
+    calls = 0
+    client = await make_client(
+        aiohttp_server, {"Listados/Provincias/": lambda: web.Response(status=503)}
+    )
+    async with client:
+        with pytest.raises(PreciosCarburantesConnectionError):
+            await client.get_provinces()
+
+
+async def test_no_retry_on_client_error(aiohttp_server: ServerFactory) -> None:
+    """A 4xx answer is not retried."""
+    calls = 0
+
+    def not_found() -> web.Response:
+        nonlocal calls
+        calls += 1
+        return web.Response(status=404)
+
+    client = await make_client(aiohttp_server, {"Listados/Provincias/": not_found})
+    async with client:
+        with pytest.raises(PreciosCarburantesConnectionError):
+            await client.get_provinces()
+    assert calls == 1
